@@ -290,3 +290,37 @@ resource "aws_glue_job" "transfer_orders" {
     "--target_path"                      = "s3://${aws_s3_bucket.processed_data.id}/orders/"
   }
 }
+
+
+resource "aws_iam_role_policy" "glue_crawler_processed_s3_access" {
+  name = "glue-crawler-processed-s3-access"
+  role = aws_iam_role.glue_crawler_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["s3:GetObject", "s3:ListBucket"]
+      Resource = [aws_s3_bucket.processed_data.arn, "${aws_s3_bucket.processed_data.arn}/*"]
+    }]
+  })
+
+
+}
+
+resource "aws_glue_crawler" "processed_orders" {
+  name          = "ecommerce-processed-orders-crawler"
+  role          = aws_iam_role.glue_crawler_role.arn
+  database_name = aws_glue_catalog_database.ecommerce.name
+
+  s3_target {
+    path = "s3://${aws_s3_bucket.processed_data.id}/orders"
+  }
+
+  configuration = jsonencode({
+    Version = 1.0
+    Grouping = {
+      TableGroupingPolicy = "CombineCompatibleSchemas"
+    }
+  })
+}
