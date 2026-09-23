@@ -9,8 +9,7 @@ Output layout (mirrors an S3 raw zone partitioned by region and date):
     output/raw/region=EU/date=2026-09-20/orders.json
     ...
 
-Each file is a JSON array of order records. Run this locally, then upload
-the output/raw/ folder to your S3 raw bucket to seed your pipeline.
+Each file is in JSON Lines format.
 """
 
 import json
@@ -41,8 +40,10 @@ PRODUCTS = [
     ("P1010", "Ergonomic Chair", 329.00),
 ]
 
-PAYMENT_METHODS = ["credit_card", "debit_card", "paypal", "gift_card", None]  # None = messy/missing
-STATUSES = ["completed", "completed", "completed", "cancelled", "refunded", "pending"]
+PAYMENT_METHODS = ["credit_card", "debit_card",
+                   "paypal", "gift_card", None]  # None = messy/missing
+STATUSES = ["completed", "completed", "completed",
+            "cancelled", "refunded", "pending"]
 
 # Date-format inconsistency pool, to simulate different store systems
 DATE_FORMATS = [
@@ -55,7 +56,8 @@ DATE_FORMATS = [
 
 def random_date_str(base_date):
     fmt = random.choice(DATE_FORMATS)
-    dt = base_date + timedelta(hours=random.randint(0, 23), minutes=random.randint(0, 59))
+    dt = base_date + timedelta(hours=random.randint(0, 23),
+                               minutes=random.randint(0, 59))
     return dt.strftime(fmt)
 
 
@@ -77,7 +79,6 @@ def make_order(region, base_date, force_currency_typo=False):
         "unit_price": unit_price,
         "currency": currency,
         "order_date": random_date_str(base_date),
-        "region": region,
         "store_id": random.choice(REGIONS[region]["store_ids"]),
         "payment_method": random.choice(PAYMENT_METHODS),
         "status": random.choice(STATUSES),
@@ -85,7 +86,8 @@ def make_order(region, base_date, force_currency_typo=False):
 
     # Randomly drop a field entirely, to simulate inconsistent upstream schemas
     if random.random() < 0.05:
-        drop_field = random.choice(["payment_method", "customer_id", "quantity"])
+        drop_field = random.choice(
+            ["payment_method", "customer_id", "quantity"])
         order.pop(drop_field, None)
 
     # Randomly null out unit_price to simulate bad data
@@ -105,7 +107,8 @@ def generate():
 
     for region in REGIONS:
         for day in days:
-            orders = [make_order(region, day) for _ in range(random.randint(40, 80))]
+            orders = [make_order(region, day)
+                      for _ in range(random.randint(40, 80))]
 
             # Inject duplicates (same order appearing twice, as if a store's
             # upload job retried and re-sent the same batch)
@@ -117,16 +120,18 @@ def generate():
                 out_root, f"region={region}", f"date={day.strftime('%Y-%m-%d')}"
             )
             os.makedirs(partition_dir, exist_ok=True)
-            file_path = os.path.join(partition_dir, "orders.json")
+            file_path = os.path.join(partition_dir, "orders.jsonl")
 
             with open(file_path, "w") as f:
-                json.dump(orders, f, indent=2)
+                for order in orders:
+                    f.write(json.dumps(order) + "\n")
 
             total_files += 1
             total_orders += len(orders)
             print(f"Wrote {len(orders)} orders -> {file_path}")
 
-    print(f"\nDone. {total_files} files, {total_orders} total order records (including intentional duplicates).")
+    print(
+        f"\nDone. {total_files} files, {total_orders} total order records (including intentional duplicates).")
 
 
 if __name__ == "__main__":
