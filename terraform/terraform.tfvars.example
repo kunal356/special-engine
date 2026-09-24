@@ -1,0 +1,9 @@
+aws_region   = "eu-west-2"
+project_name = "ecommerce-etl"
+environment  = "dev"
+
+glue_job_worker_type       = "G.1X"
+glue_job_number_of_workers = 2
+
+athena_results_retention_days = 7
+pipeline_schedule_expression  = "cron(0 2 * * ? *)"
