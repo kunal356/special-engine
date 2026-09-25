@@ -73,5 +73,5 @@ variable "max_crawler_poll_attempts" {
 variable "github_repository" {
   description = "GitHub repo allowed to assume the CI/CD deploy role, in \"owner/repo\" form (used by the OIDC trust policy)"
   type        = string
-  default     = ""
+  default     = "kunal356/special-engine"
 }
