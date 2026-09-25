@@ -26,12 +26,36 @@ spark = glueContext.spark_session
 job = Job(glueContext)
 job.init(args["JOB_NAME"], args)
 
+# Dynamic (not static) partition overwrite: mode("overwrite") only replaces
+# the specific partitions present in this run's output, rather than wiping
+# the entire target path first. Without this, a run that produces zero rows
+# (e.g. no new raw files since the last crawl) would silently delete every
+# previously processed partition while still reporting job success.
+spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
+
 # --- Read from the Glue Catalog (raw zone) ---
+# transformation_ctx is required for --job-bookmark-option to actually do
+# anything - without it, bookmarks are enabled as a job parameter but have
+# nothing to track against, and every run reprocesses the full raw history.
 dynamic_frame = glueContext.create_dynamic_frame.from_catalog(
     database=args["source_database"],
     table_name=args["source_table"],
+    transformation_ctx="raw_orders_source",
 )
 df = dynamic_frame.toDF()
+
+# Fail loudly and specifically if there's nothing to process, rather than
+# silently writing (or overwriting) an empty result. An empty source is
+# usually a real problem upstream - the raw crawler found nothing, or the
+# raw table doesn't exist yet - and deserves an actionable error, not a
+# quiet no-op that looks identical to a successful run in the logs.
+if df.rdd.isEmpty():
+    raise SystemExit(
+        "RAW_DATA_EMPTY: no records found in "
+        f"{args['source_database']}.{args['source_table']}. Check that raw "
+        "files have been uploaded and the raw crawler completed successfully "
+        "before this job runs."
+    )
 
 # --- 1. Deduplicate on order_id ---
 # Retried uploads mean the same order can appear more than once identically.

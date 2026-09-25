@@ -46,6 +46,20 @@ sns = boto3.client("sns")
 
 
 def load_processed_data(path: str) -> pd.DataFrame:
+    # Check explicitly rather than letting pandas/pyarrow raise whatever
+    # exception it happens to throw on a missing prefix - that exception
+    # still fails the job either way, but this gives a specific, readable
+    # cause that actually reaches the SNS alert instead of a buried
+    # pyarrow/fsspec stack trace.
+    bucket, _, prefix = path.replace("s3://", "").partition("/")
+    listing = s3.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=1)
+    if listing.get("KeyCount", 0) == 0:
+        raise SystemExit(
+            f"PROCESSED_DATA_EMPTY: no objects found at {path}. The transform "
+            "job may not have produced output, or hasn't run yet - check its "
+            "execution before assuming this is a data quality issue."
+        )
+
     # Reads the partitioned Parquet output (region/year/month) directly;
     # pandas + pyarrow resolve the Hive-style partition columns automatically.
     return pd.read_parquet(path, engine="pyarrow")
