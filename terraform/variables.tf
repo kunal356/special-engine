@@ -51,3 +51,9 @@ variable "alert_email" {
   type        = string
   default     = ""
 }
+
+variable "max_crawler_poll_attempts" {
+  description = "Max number of 30-second polls before a crawler is considered stuck and the pipeline fails with a timeout (60 = 30 minutes)"
+  type        = number
+  default     = 60
+}

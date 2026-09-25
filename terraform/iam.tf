@@ -128,19 +128,44 @@ resource "aws_iam_role_policy" "step_functions_glue_access" {
         Resource = "*"
       },
       {
-        Effect = "Allow"
-        Action = [
-          "events:PutRule",
-          "events:PutTargets",
-          "events:DescribeRule",
-        ]
-        Resource = "*"
-      },
-      {
         Effect   = "Allow"
         Action   = ["sns:Publish"]
         Resource = aws_sns_topic.pipeline_alerts.arn
       }
     ]
+  })
+}
+
+# -----------------------------------------------------------------------------
+# EventBridge role - separate from step_functions_role on purpose. That
+# role's trust policy only allows states.amazonaws.com to assume it, so
+# EventBridge (events.amazonaws.com) cannot use it to start executions,
+# a fairly easy mistake to copy-paste into. This role exists solely so the
+# scheduled trigger can call states:StartExecution.
+# -----------------------------------------------------------------------------
+resource "aws_iam_role" "eventbridge_invoke_role" {
+  name = "${var.project_name}-eventbridge-invoke-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "events.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "eventbridge_start_execution" {
+  name = "eventbridge-start-execution"
+  role = aws_iam_role.eventbridge_invoke_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["states:StartExecution"]
+      Resource = aws_sfn_state_machine.ecommerce_pipeline.arn
+    }]
   })
 }
