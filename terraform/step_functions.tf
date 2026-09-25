@@ -51,13 +51,16 @@ locals {
 #   - NotifyFailure itself is wrapped in Retry/Catch, so a broken SNS
 #     publish still reaches a terminal Fail state instead of leaving the
 #     execution stuck.
+#   - A dedicated Great Expectations data quality gate runs after the
+#     transform job and before the processed crawler - the processed data
+#     never becomes queryable in Athena if it fails critical checks.
 # -----------------------------------------------------------------------------
 resource "aws_sfn_state_machine" "ecommerce_pipeline" {
   name     = "${var.project_name}-pipeline"
   role_arn = aws_iam_role.step_functions_role.arn
 
   definition = jsonencode({
-    Comment        = "Raw crawl -> transform -> processed crawl, with retry/catch/timeout on every step"
+    Comment        = "Raw crawl -> transform -> data quality check -> processed crawl, with retry/catch/timeout on every step"
     StartAt        = "StartRawCrawler"
     TimeoutSeconds = 3600
 
@@ -109,18 +112,18 @@ resource "aws_sfn_state_machine" "ecommerce_pipeline" {
       IsRawPollTimedOut = {
         Type = "Choice"
         Choices = [{
-          Variable            = "$.rawPoll.attempts"
+          Variable                 = "$.rawPoll.attempts"
           NumericGreaterThanEquals = var.max_crawler_poll_attempts
-          Next                = "HandleRawCrawlerTimeout"
+          Next                     = "HandleRawCrawlerTimeout"
         }]
         Default = "WaitRawCrawler"
       }
       HandleRawCrawlerTimeout = {
         Type = "Pass"
         Parameters = {
-          Error        = "CrawlerTimeout"
-          Cause        = "Raw crawler did not reach READY state within the allotted polling window"
-          FailedState  = "StartRawCrawler / CheckRawCrawler (polling loop)"
+          Error       = "CrawlerTimeout"
+          Cause       = "Raw crawler did not reach READY state within the allotted polling window"
+          FailedState = "StartRawCrawler / CheckRawCrawler (polling loop)"
         }
         ResultPath = "$.error"
         Next       = "NotifyFailure"
@@ -137,9 +140,9 @@ resource "aws_sfn_state_machine" "ecommerce_pipeline" {
       HandleRawCrawlFailed = {
         Type = "Pass"
         Parameters = {
-          Error         = "CrawlerRunFailed"
-          "Cause.$"     = "States.Format('Raw crawler run did not succeed (LastCrawl.Status: {})', $.crawlerStatus.Crawler.LastCrawl.Status)"
-          FailedState   = "CheckRawCrawler"
+          Error       = "CrawlerRunFailed"
+          "Cause.$"   = "States.Format('Raw crawler run did not succeed (LastCrawl.Status: {})', $.crawlerStatus.Crawler.LastCrawl.Status)"
+          FailedState = "CheckRawCrawler"
         }
         ResultPath = "$.error"
         Next       = "NotifyFailure"
@@ -147,9 +150,9 @@ resource "aws_sfn_state_machine" "ecommerce_pipeline" {
       HandleStartRawCrawlerFailure = {
         Type = "Pass"
         Parameters = {
-          "Error.$"    = "$.error.Error"
-          "Cause.$"    = "$.error.Cause"
-          FailedState  = "StartRawCrawler"
+          "Error.$"   = "$.error.Error"
+          "Cause.$"   = "$.error.Cause"
+          FailedState = "StartRawCrawler"
         }
         ResultPath = "$.error"
         Next       = "NotifyFailure"
@@ -157,9 +160,9 @@ resource "aws_sfn_state_machine" "ecommerce_pipeline" {
       HandleCheckRawCrawlerFailure = {
         Type = "Pass"
         Parameters = {
-          "Error.$"    = "$.error.Error"
-          "Cause.$"    = "$.error.Cause"
-          FailedState  = "CheckRawCrawler"
+          "Error.$"   = "$.error.Error"
+          "Cause.$"   = "$.error.Cause"
+          FailedState = "CheckRawCrawler"
         }
         ResultPath = "$.error"
         Next       = "NotifyFailure"
@@ -177,9 +180,9 @@ resource "aws_sfn_state_machine" "ecommerce_pipeline" {
       HandleRunTransformJobFailure = {
         Type = "Pass"
         Parameters = {
-          "Error.$"    = "$.error.Error"
-          "Cause.$"    = "$.error.Cause"
-          FailedState  = "RunTransformJob"
+          "Error.$"   = "$.error.Error"
+          "Cause.$"   = "$.error.Cause"
+          FailedState = "RunTransformJob"
         }
         ResultPath = "$.error"
         Next       = "NotifyFailure"
@@ -202,9 +205,9 @@ resource "aws_sfn_state_machine" "ecommerce_pipeline" {
       HandleDataQualityCheckFailure = {
         Type = "Pass"
         Parameters = {
-          "Error.$"    = "$.error.Error"
-          "Cause.$"    = "$.error.Cause"
-          FailedState  = "RunDataQualityCheck"
+          "Error.$"   = "$.error.Error"
+          "Cause.$"   = "$.error.Cause"
+          FailedState = "RunDataQualityCheck"
         }
         ResultPath = "$.error"
         Next       = "NotifyFailure"
@@ -257,18 +260,18 @@ resource "aws_sfn_state_machine" "ecommerce_pipeline" {
       IsProcessedPollTimedOut = {
         Type = "Choice"
         Choices = [{
-          Variable            = "$.processedPoll.attempts"
+          Variable                 = "$.processedPoll.attempts"
           NumericGreaterThanEquals = var.max_crawler_poll_attempts
-          Next                = "HandleProcessedCrawlerTimeout"
+          Next                     = "HandleProcessedCrawlerTimeout"
         }]
         Default = "WaitProcessedCrawler"
       }
       HandleProcessedCrawlerTimeout = {
         Type = "Pass"
         Parameters = {
-          Error        = "CrawlerTimeout"
-          Cause        = "Processed crawler did not reach READY state within the allotted polling window"
-          FailedState  = "StartProcessedCrawler / CheckProcessedCrawler (polling loop)"
+          Error       = "CrawlerTimeout"
+          Cause       = "Processed crawler did not reach READY state within the allotted polling window"
+          FailedState = "StartProcessedCrawler / CheckProcessedCrawler (polling loop)"
         }
         ResultPath = "$.error"
         Next       = "NotifyFailure"
@@ -285,9 +288,9 @@ resource "aws_sfn_state_machine" "ecommerce_pipeline" {
       HandleProcessedCrawlFailed = {
         Type = "Pass"
         Parameters = {
-          Error         = "CrawlerRunFailed"
-          "Cause.$"     = "States.Format('Processed crawler run did not succeed (LastCrawl.Status: {})', $.crawlerStatus.Crawler.LastCrawl.Status)"
-          FailedState   = "CheckProcessedCrawler"
+          Error       = "CrawlerRunFailed"
+          "Cause.$"   = "States.Format('Processed crawler run did not succeed (LastCrawl.Status: {})', $.crawlerStatus.Crawler.LastCrawl.Status)"
+          FailedState = "CheckProcessedCrawler"
         }
         ResultPath = "$.error"
         Next       = "NotifyFailure"
@@ -295,9 +298,9 @@ resource "aws_sfn_state_machine" "ecommerce_pipeline" {
       HandleStartProcessedCrawlerFailure = {
         Type = "Pass"
         Parameters = {
-          "Error.$"    = "$.error.Error"
-          "Cause.$"    = "$.error.Cause"
-          FailedState  = "StartProcessedCrawler"
+          "Error.$"   = "$.error.Error"
+          "Cause.$"   = "$.error.Cause"
+          FailedState = "StartProcessedCrawler"
         }
         ResultPath = "$.error"
         Next       = "NotifyFailure"
@@ -305,9 +308,9 @@ resource "aws_sfn_state_machine" "ecommerce_pipeline" {
       HandleCheckProcessedCrawlerFailure = {
         Type = "Pass"
         Parameters = {
-          "Error.$"    = "$.error.Error"
-          "Cause.$"    = "$.error.Cause"
-          FailedState  = "CheckProcessedCrawler"
+          "Error.$"   = "$.error.Error"
+          "Cause.$"   = "$.error.Cause"
+          FailedState = "CheckProcessedCrawler"
         }
         ResultPath = "$.error"
         Next       = "NotifyFailure"
@@ -320,8 +323,8 @@ resource "aws_sfn_state_machine" "ecommerce_pipeline" {
         Type     = "Task"
         Resource = "arn:aws:states:::sns:publish"
         Parameters = {
-          TopicArn = aws_sns_topic.pipeline_alerts.arn
-          Subject  = "${var.project_name} pipeline FAILED"
+          TopicArn    = aws_sns_topic.pipeline_alerts.arn
+          Subject     = "${var.project_name} pipeline FAILED"
           "Message.$" = "States.Format('Pipeline failed.\nFailed step: {}\nError: {}\nCause: {}\nExecution: {}\nExecution ID: {}', $.error.FailedState, $.error.Error, $.error.Cause, $$.Execution.Name, $$.Execution.Id)"
         }
         Retry = [local.sns_retry]

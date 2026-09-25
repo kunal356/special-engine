@@ -89,37 +89,48 @@ Building the pipeline was only part of the challenge. A significant focus of thi
 
 ```
 terraform/
-├── main.tf              # provider config, terraform block
-├── variables.tf          # all input variables
-├── outputs.tf             # all outputs
-├── s3.tf                  # raw, processed, glue-assets, athena-results buckets
-├── iam.tf                  # every IAM role and policy
-├── glue.tf                  # Glue database, crawlers, transform job
-├── athena.tf                 # Athena workgroup + saved queries
-├── step_functions.tf          # orchestration + failure handling
-├── sns.tf                      # failure alert topic
-├── cloudwatch.tf                 # alarms watching the state machine
-├── moved.tf                       # state migration for a mid-project rename
-├── terraform.tfvars.example        # copy to terraform.tfvars and fill in
+├── main.tf                    # provider config, remote S3 state backend
+├── variables.tf                # all input variables
+├── outputs.tf                   # all outputs
+├── s3.tf                         # raw, processed, glue-assets, athena-results buckets
+├── iam.tf                         # every IAM role and policy
+├── glue.tf                         # Glue database, crawlers, transform + DQ jobs
+├── athena.tf                        # Athena workgroup + saved queries
+├── step_functions.tf                 # orchestration + failure handling
+├── sns.tf                              # failure alert topic
+├── cloudwatch.tf                        # alarms watching the state machine
+├── github_oidc.tf                        # GitHub Actions OIDC federation for CI/CD
+├── moved.tf                                # state migration for a mid-project rename
+├── terraform.tfvars.example                 # copy to terraform.tfvars and fill in
 └── .gitignore
 
-utils/
-├── transform_orders.py		# the Glue PySpark transformation job
-├── data_quality_check.py		# data quality check on processed data
-└── generate_sample_data.py		# generate data
+bootstrap/
+└── main.tf                # one-time setup: creates the remote state S3 bucket + DynamoDB lock table
 
-docs/diagrams/
-├── architecture.png       # AWS service topology
-└── data-flow.png          # data movement through the pipeline
+utils/
+├── transform_orders.py         # the Glue PySpark transformation job
+└── data_quality_check.py       # Great Expectations validation (Glue Python Shell)
+
+.github/workflows/
+├── pr-validate.yml        # fmt/validate/lint/security-scan + plan-as-PR-comment
+└── deploy.yml              # plan on push to main, apply behind a manual approval gate
+
+docs/
+├── CI-CD-SETUP.md       # one-time manual steps to wire up GitHub Actions + OIDC
+└── diagrams/
+    ├── architecture.png       # AWS service topology
+    └── data-flow.png          # data movement through the pipeline
 ```
+
+---
 
 ## Setup
 
 1. Copy `terraform.tfvars.example` to `terraform.tfvars` and fill in your values
    (at minimum, set `alert_email` if you want failure emails).
-2. Upload the transform script to the Glue assets bucket:
+2. Create the remote state backend (one-time, see `docs/CI-CD-SETUP.md`):
    ```bash
-   aws s3 cp scripts/transform_orders.py s3://<glue-assets-bucket>/scripts/transform_orders.py
+   cd bootstrap && terraform init && terraform apply && cd ..
    ```
 3. Deploy the infrastructure:
    ```bash
@@ -127,17 +138,45 @@ docs/diagrams/
    terraform plan
    terraform apply
    ```
-4. Upload sample data:
+4. Upload the Glue scripts to the assets bucket:
+   ```bash
+   aws s3 cp scripts/transform_orders.py s3://<glue-assets-bucket>/scripts/transform_orders.py
+   aws s3 cp scripts/data_quality_check.py s3://<glue-assets-bucket>/scripts/data_quality_check.py
+   ```
+5. Upload sample data:
    ```bash
    aws s3 sync ./sample_data/output/raw/ s3://<raw-bucket>/raw/
    ```
-5. Manually trigger one Step Functions execution from the AWS Console to confirm
+6. Manually trigger one Step Functions execution from the AWS Console to confirm
    the pipeline runs end to end before relying on the daily schedule.
+7. (Optional but recommended) Wire up CI/CD by following `docs/CI-CD-SETUP.md` -
+   it covers the GitHub OIDC role, the repo secret, and the approval gate.
+
+---
+
+## CI/CD
+
+Infrastructure changes go through the same review discipline as application
+code:
+
+- **Every pull request** runs `terraform fmt -check`, `terraform validate`,
+  `tflint`, a Checkov security scan, a Python syntax check on the Glue
+  scripts, and posts the exact `terraform plan` diff as a PR comment.
+- **Merging to `main`** re-plans, then pauses at a GitHub Environment
+  approval gate before applying - so infrastructure changes are proposed by
+  a merge and confirmed by a human, not silently auto-applied.
+- **Authentication uses GitHub's OIDC provider**, not long-lived AWS access
+  keys - each workflow run gets a short-lived token scoped to one specific
+  repo, with no static credential sitting in repo secrets to leak or rotate.
+
+Full one-time setup steps are in `docs/CI-CD-SETUP.md`.
+
+---
 
 ## Roadmap
 
-- [ ] Explicit data quality checks (e.g. Great Expectations) as a pipeline step
-- [ ] CI/CD via GitHub Actions
+- [x] Explicit data quality checks (Great Expectations) as a pipeline step
+- [x] CI/CD via GitHub Actions
 - [ ] IAM least-privilege audit + Secrets Manager
 - [ ] Amazon Redshift as an alternative serving layer for concurrent BI workloads
 

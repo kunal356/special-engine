@@ -7,7 +7,7 @@
 resource "aws_cloudwatch_metric_alarm" "pipeline_execution_failed" {
   alarm_name          = "${var.project_name}-execution-failed"
   comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods   = 1
+  evaluation_periods  = 1
   metric_name         = "ExecutionsFailed"
   namespace           = "AWS/States"
   period              = 300
@@ -26,7 +26,7 @@ resource "aws_cloudwatch_metric_alarm" "pipeline_execution_failed" {
 resource "aws_cloudwatch_metric_alarm" "pipeline_execution_timed_out" {
   alarm_name          = "${var.project_name}-execution-timed-out"
   comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods   = 1
+  evaluation_periods  = 1
   metric_name         = "ExecutionsTimedOut"
   namespace           = "AWS/States"
   period              = 300

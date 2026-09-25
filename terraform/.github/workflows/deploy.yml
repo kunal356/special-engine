@@ -1,0 +1,100 @@
+name: Terraform Deploy (main)
+
+# Runs on every push to main (i.e. every merged PR). Plan always runs
+# automatically; apply requires a GitHub Environment approval gate
+# ("production") before it executes - so merging to main proposes a
+# change, it doesn't unilaterally apply one. Set up that environment's
+# required reviewers in the repo's Settings -> Environments once.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**.tf"
+      - "utils/**.py"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch: {} # allow a manual re-run without a new commit
+
+permissions:
+  contents: read
+  id-token: write # required to mint the OIDC token
+
+env:
+  TF_VERSION: "1.9.5"
+  AWS_REGION: "eu-west-2"
+
+jobs:
+  plan:
+    name: terraform plan
+    runs-on: ubuntu-latest
+    outputs:
+      exitcode: ${{ steps.plan.outputs.exitcode }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v6
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: terraform init
+        run: terraform init
+
+      - name: terraform plan
+        id: plan
+        run: |
+          terraform plan -no-color -detailed-exitcode -out=tfplan.binary
+        continue-on-error: true
+
+      - name: Surface plan failure
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: tfplan.binary
+          retention-days: 5
+
+  apply:
+    name: terraform apply
+    runs-on: ubuntu-latest
+    needs: plan
+    if: needs.plan.outputs.exitcode == '2' # 2 = changes present; 0 = no changes, skip apply entirely
+    environment:
+      name: production # requires manual approval - configure required reviewers in repo settings
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: terraform init
+        run: terraform init
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+
+      - name: terraform apply (using the exact plan reviewed above)
+        run: terraform apply -auto-approve tfplan.binary
+
+      - name: Sync Glue scripts to S3 (post-apply, bucket now guaranteed to exist)
+        run: |
+          BUCKET=$(terraform output -raw glue_assets_bucket_name)
+          aws s3 cp scripts/transform_orders.py "s3://$BUCKET/scripts/transform_orders.py"
+          aws s3 cp scripts/data_quality_check.py "s3://$BUCKET/scripts/data_quality_check.py"

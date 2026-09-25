@@ -24,7 +24,6 @@ is improving or degrading over time.
 
 import sys
 import json
-import re
 from datetime import datetime, timezone
 
 import boto3
@@ -36,9 +35,9 @@ args = getResolvedOptions(sys.argv, [
     "target_path", "report_bucket", "report_prefix", "sns_topic_arn",
 ])
 
-TARGET_PATH = args["target_path"]                # s3://.../orders/
+TARGET_PATH = args["target_path"]                  # s3://.../orders/
 REPORT_BUCKET = args["report_bucket"]
-REPORT_PREFIX = args["report_prefix"].rstrip("/")  # e.g. quality-reports
+REPORT_PREFIX = args["report_prefix"].rstrip("/")   # e.g. quality-reports
 SNS_TOPIC_ARN = args["sns_topic_arn"]
 
 s3 = boto3.client("s3")

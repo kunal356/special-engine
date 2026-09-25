@@ -42,13 +42,13 @@ resource "aws_glue_job" "transform_orders" {
   }
 
   default_arguments = {
-    "--job-bookmark-option"               = "job-bookmark-enable"
-    "--TempDir"                           = "s3://${aws_s3_bucket.glue_assets.id}/temp/"
-    "--enable-metrics"                    = "true"
-    "--enable-continuous-cloudwatch-log"  = "true"
-    "--source_database"                   = aws_glue_catalog_database.ecommerce.name
-    "--source_table"                      = "raw"
-    "--target_path"                       = "s3://${aws_s3_bucket.processed_data.id}/orders/"
+    "--job-bookmark-option"              = "job-bookmark-enable"
+    "--TempDir"                          = "s3://${aws_s3_bucket.glue_assets.id}/temp/"
+    "--enable-metrics"                   = "true"
+    "--enable-continuous-cloudwatch-log" = "true"
+    "--source_database"                  = aws_glue_catalog_database.ecommerce.name
+    "--source_table"                     = "raw"
+    "--target_path"                      = "s3://${aws_s3_bucket.processed_data.id}/orders/"
   }
 }
 

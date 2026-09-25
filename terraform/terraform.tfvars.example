@@ -7,3 +7,9 @@ glue_job_number_of_workers = 2
 
 athena_results_retention_days = 7
 pipeline_schedule_expression  = "cron(0 2 * * ? *)"
+
+alert_email = ""
+
+# "owner/repo" of your GitHub repository - required for CI/CD OIDC access.
+# Leave blank if you're not setting up GitHub Actions yet.
+github_repository = ""

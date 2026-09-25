@@ -47,3 +47,8 @@ output "quality_reports_path" {
   description = "S3 path where Great Expectations JSON reports are written after each run"
   value       = "s3://${aws_s3_bucket.processed_data.id}/${var.quality_report_prefix}/"
 }
+
+output "github_actions_deploy_role_arn" {
+  description = "IAM role ARN GitHub Actions assumes via OIDC to run terraform plan/apply"
+  value       = var.github_repository != "" ? aws_iam_role.github_actions_deploy[0].arn : null
+}

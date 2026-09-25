@@ -6,19 +6,24 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.0"
     }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
   }
 
-  # Uncomment and configure once you're ready to move state off your laptop.
-  # A local state file is fine for solo learning, but a real team setup
-  # would use an S3 backend + DynamoDB lock table here.
-  #
-  # backend "s3" {
-  #   bucket         = "your-terraform-state-bucket"
-  #   key            = "ecommerce-etl/terraform.tfstate"
-  #   region         = "eu-west-2"
-  #   dynamodb_table = "terraform-locks"
-  #   encrypt        = true
-  # }
+  # Remote state - required for CI/CD, since GitHub Actions runners are
+  # ephemeral and have no local state file between runs. Bucket and lock
+  # table are created once by bootstrap/ (see that folder's README), then
+  # referenced here by name.
+  backend "s3" {
+    bucket = "ecommerce-etl-tfstate"
+    key    = "ecommerce-etl/terraform.tfstate"
+    region = "eu-west-2"
+    # dynamodb_table = "ecommerce-etl-tf-locks"
+    use_lockfile = true
+    encrypt      = true
+  }
 }
 
 provider "aws" {
