@@ -103,9 +103,10 @@ terraform/
 ├── terraform.tfvars.example        # copy to terraform.tfvars and fill in
 └── .gitignore
 
-scripts/
-└── transform_orders.py    # the Glue PySpark transformation job
-
+utils/
+├── transform_orders.py		# the Glue PySpark transformation job
+├── data_quality_check.py		# data quality check on processed data
+└── generate_sample_data.py		# generate data
 
 docs/diagrams/
 ├── architecture.png       # AWS service topology

@@ -53,6 +53,34 @@ resource "aws_glue_job" "transform_orders" {
 }
 
 # -----------------------------------------------------------------------------
+# Data quality check: Great Expectations validation of the processed data,
+# run as a Python Shell job rather than a Spark ETL job. This step doesn't
+# need distributed compute, and Python Shell starts in seconds rather than
+# the minute-plus cold start of a Spark job, which matters for a validation
+# gate that runs on every single pipeline execution.
+# -----------------------------------------------------------------------------
+resource "aws_glue_job" "data_quality_check" {
+  name         = "${var.project_name}-data-quality-check"
+  role_arn     = aws_iam_role.glue_etl_role.arn
+  glue_version = "3.0" # Python Shell jobs are pinned to Glue 1.0/2.0/3.0
+  max_capacity = 1      # smallest Python Shell size (1 DPU); this is a lightweight validation step
+
+  command {
+    name            = "pythonshell"
+    script_location = "s3://${aws_s3_bucket.glue_assets.id}/${var.glue_dq_script_key}"
+    python_version  = "3.9"
+  }
+
+  default_arguments = {
+    "--additional-python-modules" = "great_expectations==1.3.*,pandas,pyarrow"
+    "--target_path"               = "s3://${aws_s3_bucket.processed_data.id}/orders/"
+    "--report_bucket"             = aws_s3_bucket.processed_data.id
+    "--report_prefix"             = var.quality_report_prefix
+    "--sns_topic_arn"             = aws_sns_topic.pipeline_alerts.arn
+  }
+}
+
+# -----------------------------------------------------------------------------
 # Crawler 2: processed zone -> makes cleaned Parquet queryable in Athena
 # -----------------------------------------------------------------------------
 resource "aws_glue_crawler" "processed_orders" {

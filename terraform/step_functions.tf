@@ -172,7 +172,7 @@ resource "aws_sfn_state_machine" "ecommerce_pipeline" {
         Parameters = { JobName = aws_glue_job.transform_orders.name }
         Retry      = [local.job_transient_retry]
         Catch      = [{ ErrorEquals = ["States.ALL"], ResultPath = "$.error", Next = "HandleRunTransformJobFailure" }]
-        Next       = "StartProcessedCrawler"
+        Next       = "RunDataQualityCheck"
       }
       HandleRunTransformJobFailure = {
         Type = "Pass"
@@ -180,6 +180,31 @@ resource "aws_sfn_state_machine" "ecommerce_pipeline" {
           "Error.$"    = "$.error.Error"
           "Cause.$"    = "$.error.Cause"
           FailedState  = "RunTransformJob"
+        }
+        ResultPath = "$.error"
+        Next       = "NotifyFailure"
+      }
+
+      # ---- Data quality gate (Great Expectations) ----
+      # Runs after transform, before the processed data is cataloged and
+      # exposed to Athena. A critical-severity failure here (see
+      # scripts/data_quality_check.py) fails this Glue job run, which this
+      # Catch routes to the shared failure path - the processed crawler
+      # never runs against data that failed critical checks.
+      RunDataQualityCheck = {
+        Type       = "Task"
+        Resource   = "arn:aws:states:::glue:startJobRun.sync"
+        Parameters = { JobName = aws_glue_job.data_quality_check.name }
+        Retry      = [local.job_transient_retry]
+        Catch      = [{ ErrorEquals = ["States.ALL"], ResultPath = "$.error", Next = "HandleDataQualityCheckFailure" }]
+        Next       = "StartProcessedCrawler"
+      }
+      HandleDataQualityCheckFailure = {
+        Type = "Pass"
+        Parameters = {
+          "Error.$"    = "$.error.Error"
+          "Cause.$"    = "$.error.Cause"
+          FailedState  = "RunDataQualityCheck"
         }
         ResultPath = "$.error"
         Next       = "NotifyFailure"

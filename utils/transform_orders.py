@@ -9,7 +9,6 @@ Handles:
 """
 
 import sys
-from awsglue.transforms import *
 from awsglue.utils import getResolvedOptions
 from awsglue.context import GlueContext
 from awsglue.job import Job
@@ -39,8 +38,7 @@ df = dynamic_frame.toDF()
 before_count = df.count()
 df = df.dropDuplicates(["order_id"])
 after_count = df.count()
-print(
-    f"Deduplication: {before_count} -> {after_count} rows ({before_count - after_count} duplicates removed)")
+print(f"Deduplication: {before_count} -> {after_count} rows ({before_count - after_count} duplicates removed)")
 
 # --- 2. Standardize order_date across multiple inconsistent formats ---
 # Stores send dates as "2026-09-22T09:51:44", "2026-09-22 09:51:44",
@@ -54,8 +52,7 @@ date_formats = [
 
 parsed_date = F.lit(None).cast("timestamp")
 for fmt in date_formats:
-    parsed_date = F.coalesce(
-        parsed_date, F.to_timestamp(F.col("order_date"), fmt))
+    parsed_date = F.coalesce(parsed_date, F.to_timestamp(F.col("order_date"), fmt))
 
 df = df.withColumn("order_date_parsed", parsed_date)
 df = df.withColumn("date_parse_failed", F.col("order_date_parsed").isNull())
@@ -64,23 +61,21 @@ df = df.withColumn("date_parse_failed", F.col("order_date_parsed").isNull())
 # Handles lowercase ("usd"), trailing symbols ("USD$"), and blank/null values.
 df = df.withColumn(
     "currency_clean",
-    F.when(F.col("currency").isNull() | (
-        F.trim(F.col("currency")) == ""), None)
+    F.when(F.col("currency").isNull() | (F.trim(F.col("currency")) == ""), None)
      .otherwise(F.upper(F.regexp_replace(F.col("currency"), r"[^A-Za-z]", "")))
 )
 df = df.withColumn("currency_invalid", F.col("currency_clean").isNull())
 
 # --- 4. Handle null unit_price ---
-# Don't silently drop these - flag them so downstream consumers (and your
-# data quality dashboard, once you build one) can decide what to do.
+# Don't silently drop these - flag them so downstream consumers (and the
+# data quality check that runs after this job) can decide what to do.
 df = df.withColumn("unit_price", F.col("unit_price").cast(DoubleType()))
 df = df.withColumn("price_missing", F.col("unit_price").isNull())
 
 # --- 5. Compute a derived field useful for analytics: line total ---
 df = df.withColumn(
     "line_total",
-    F.when(F.col("unit_price").isNotNull(), F.col(
-        "unit_price") * F.col("quantity")).otherwise(None)
+    F.when(F.col("unit_price").isNotNull(), F.col("unit_price") * F.col("quantity")).otherwise(None)
 )
 
 # --- 6. Re-derive partition columns for the processed zone ---

@@ -34,6 +34,18 @@ variable "glue_script_key" {
   default     = "scripts/transform_orders.py"
 }
 
+variable "glue_dq_script_key" {
+  description = "S3 key (within the glue_assets bucket) where the data quality check script lives"
+  type        = string
+  default     = "scripts/data_quality_check.py"
+}
+
+variable "quality_report_prefix" {
+  description = "S3 prefix (within the processed bucket) where Great Expectations JSON reports are written"
+  type        = string
+  default     = "quality-reports"
+}
+
 variable "athena_results_retention_days" {
   description = "Days to retain Athena query result files before auto-expiring them"
   type        = number

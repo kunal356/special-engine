@@ -89,6 +89,11 @@ resource "aws_iam_role_policy" "glue_etl_s3_access" {
         Effect   = "Allow"
         Action   = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
         Resource = [aws_s3_bucket.glue_assets.arn, "${aws_s3_bucket.glue_assets.arn}/*"]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["sns:Publish"]
+        Resource = aws_sns_topic.pipeline_alerts.arn
       }
     ]
   })

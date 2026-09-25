@@ -37,3 +37,13 @@ output "pipeline_alerts_topic_arn" {
   description = "SNS topic ARN for pipeline failure alerts - subscribe additional endpoints here if needed"
   value       = aws_sns_topic.pipeline_alerts.arn
 }
+
+output "data_quality_check_job_name" {
+  description = "Glue Python Shell job name for the Great Expectations validation step"
+  value       = aws_glue_job.data_quality_check.name
+}
+
+output "quality_reports_path" {
+  description = "S3 path where Great Expectations JSON reports are written after each run"
+  value       = "s3://${aws_s3_bucket.processed_data.id}/${var.quality_report_prefix}/"
+}
