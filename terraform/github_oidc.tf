@@ -77,9 +77,9 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         # silently breaks on the next provider upgrade. Scoping is done on
         # the Resource side instead: full S3 access, but only to buckets
         # this project actually owns (including its own state bucket).
-        Sid      = "S3ProjectAndStateBuckets"
-        Effect   = "Allow"
-        Action   = ["s3:*"]
+        Sid    = "S3ProjectAndStateBuckets"
+        Effect = "Allow"
+        Action = ["s3:*"]
         Resource = [
           "arn:aws:s3:::${var.project_name}-*",
           "arn:aws:s3:::${var.project_name}-*/*",
