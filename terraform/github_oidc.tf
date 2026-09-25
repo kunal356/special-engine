@@ -43,8 +43,8 @@ resource "aws_iam_role" "github_actions_deploy" {
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
-        StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:kunal356@91783071/special-engine@1387735298:pull_request:*"
+        StringEquals = {
+          "token.actions.githubusercontent.com:sub" = "repo:kunal356@91783071/special-engine@1387735298:pull_request"
         }
       }
     }]
