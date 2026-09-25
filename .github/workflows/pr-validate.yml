@@ -13,7 +13,7 @@ on:
     branches: [main]
     paths:
       - "**.tf"
-      - "scripts/**.py"
+      - "utils/**.py"
       - ".github/workflows/**"
 
 permissions:
@@ -60,7 +60,7 @@ jobs:
 
       - name: Python syntax check (Glue scripts)
         run: |
-          python3 -m py_compile scripts/transform_orders.py scripts/data_quality_check.py
+          python3 -m py_compile utils/transform_orders.py utils/data_quality_check.py
 
   plan:
     name: terraform plan
