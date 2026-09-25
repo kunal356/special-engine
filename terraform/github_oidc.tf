@@ -43,8 +43,8 @@ resource "aws_iam_role" "github_actions_deploy" {
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
-        StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:*"
+        StringEquals = {
+          "token.actions.githubusercontent.com:sub" = "repo:kunal356@91783071/special-engine@1387735298:pull_request"
         }
       }
     }]
@@ -77,9 +77,9 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         # silently breaks on the next provider upgrade. Scoping is done on
         # the Resource side instead: full S3 access, but only to buckets
         # this project actually owns (including its own state bucket).
-        Sid      = "S3ProjectAndStateBuckets"
-        Effect   = "Allow"
-        Action   = ["s3:*"]
+        Sid    = "S3ProjectAndStateBuckets"
+        Effect = "Allow"
+        Action = ["s3:*"]
         Resource = [
           "arn:aws:s3:::${var.project_name}-*",
           "arn:aws:s3:::${var.project_name}-*/*",

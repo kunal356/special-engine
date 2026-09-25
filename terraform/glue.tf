@@ -63,7 +63,7 @@ resource "aws_glue_job" "data_quality_check" {
   name         = "${var.project_name}-data-quality-check"
   role_arn     = aws_iam_role.glue_etl_role.arn
   glue_version = "3.0" # Python Shell jobs are pinned to Glue 1.0/2.0/3.0
-  max_capacity = 1      # smallest Python Shell size (1 DPU); this is a lightweight validation step
+  max_capacity = 1     # smallest Python Shell size (1 DPU); this is a lightweight validation step
 
   command {
     name            = "pythonshell"
