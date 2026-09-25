@@ -119,18 +119,22 @@ resource "aws_iam_role_policy" "step_functions_glue_access" {
   name = "stepfunctions-glue-access"
   role = aws_iam_role.step_functions_role.id
 
+  # All four of these actions support resource-level scoping (each one
+  # names the specific crawler/job it's calling), so there's no reason for
+  # this role to be able to start or inspect any crawler/job in the
+  # account - only this pipeline's own two crawlers and two jobs.
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = [
-          "glue:StartCrawler",
-          "glue:GetCrawler",
-          "glue:StartJobRun",
-          "glue:GetJobRun",
-        ]
-        Resource = "*"
+        Effect   = "Allow"
+        Action   = ["glue:StartCrawler", "glue:GetCrawler"]
+        Resource = [aws_glue_crawler.raw_orders.arn, aws_glue_crawler.processed_orders.arn]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["glue:StartJobRun", "glue:GetJobRun"]
+        Resource = [aws_glue_job.transform_orders.arn, aws_glue_job.data_quality_check.arn]
       },
       {
         Effect   = "Allow"
