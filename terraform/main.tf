@@ -17,12 +17,11 @@ terraform {
   # table are created once by bootstrap/ (see that folder's README), then
   # referenced here by name.
   backend "s3" {
-    bucket = "ecommerce-etl-tfstate"
-    key    = "ecommerce-etl/terraform.tfstate"
-    region = "eu-west-2"
-    # dynamodb_table = "ecommerce-etl-tf-locks"
-    use_lockfile = true
-    encrypt      = true
+    bucket         = "ecommerce-etl-tfstate"
+    key            = "ecommerce-etl/terraform.tfstate"
+    region         = "eu-west-2"
+    dynamodb_table = "ecommerce-etl-tf-locks"
+    encrypt        = true
   }
 }
 
