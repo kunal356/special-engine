@@ -47,3 +47,9 @@ terraform.rc
 
 # output
 /output
+
+# Virtual Environment
+/venv
+
+# pycache
+__pycache__/
